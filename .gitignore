@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Model Weights (too large for GitHub)
+*.pth
+*.pt
+*.onnx
+*.h5
+*.pkl
+*.joblib
+
+# Large Media (video background)
+*.mp4
+*.avi
+*.mov
+
+# Dataset folders (large image collections)
+EyeVisionAI/datasets/DRIVE/
+EyeVisionAI/datasets/REFUGE/
+EyeVisionAI/datasets/RIM_ONE/
+EyeVisionAI/datasets/APTOS/
+EyeVisionAI/datasets/ClassificationData/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Streamlit
+.streamlit/
+
+# Misc
+*.log
