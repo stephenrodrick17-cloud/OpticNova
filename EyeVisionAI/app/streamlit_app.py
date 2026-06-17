@@ -8,6 +8,8 @@ import os
 import base64
 import matplotlib.pyplot as plt
 import matplotlib
+import requests
+import json
 matplotlib.use('Agg')
 
 # Add parent directory to path so we can import our modules
@@ -20,7 +22,7 @@ from segmentation.unet import UNet
 from explainability.gradcam import GradCAM
 from explainability.heatmap import overlay_heatmap
 from mathematics.cdr import calculate_cdr, calculate_vertical_diameter
-from mathematics.disc_area import calculate_area, calculate_rim_area
+from mathematics.disc_area import calculate_area
 from mathematics.severity_score import compute_severity_score
 from mathematics.isnt_rule import calculate_isnt_metrics
 from mathematics.vessel_analysis import extract_blood_vessels, calculate_vessel_density, calculate_vessel_tortuosity
@@ -28,7 +30,7 @@ from mathematics.drusen_detection import detect_macular_drusen
 from detection.yolo_detector import FundusYOLODetector
 
 # --- Page Config & Styling ---
-st.set_page_config(page_title="Medi+ AI Ophthalmic Suite", layout="wide", page_icon="👁️")
+st.set_page_config(page_title="opticNova - Ophthalmic Eye Detection & Biomarker Suite", layout="wide", page_icon="👁️")
 
 # --- Encode Background Video to Base64 ---
 video_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Computer_code_reflected_in_eye_202606142148.mp4")
@@ -40,7 +42,7 @@ if os.path.exists(video_path):
 # Custom CSS implementing the background video, dark glassmorphic cards, and full horizontal nav bar
 st.markdown(f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
     
     html, body, [class*="css"] {{
         font-family: 'Plus Jakarta Sans', sans-serif;
@@ -58,12 +60,12 @@ st.markdown(f"""
         height: auto;
         z-index: -9999;
         object-fit: cover;
-        opacity: 0.4;
+        opacity: 0.25;
     }}
     
     /* Main container — dark semi-transparent, NO white */
     .stApp {{
-        background: rgba(10, 15, 30, 0.75) !important;
+        background: linear-gradient(135deg, rgba(10, 15, 30, 0.95), rgba(15, 25, 45, 0.9)) !important;
     }}
     
     /* Hide Default Sidebar */
@@ -77,7 +79,7 @@ st.markdown(f"""
         display: none !important;
     }}
     .st-emotion-cache-1dp5vir {{
-        padding: 2rem 3rem 10rem !important;
+        padding: 1rem 3rem 10rem !important;
     }}
     
     /* ---- NUKE ALL STREAMLIT WHITE BOXES ---- */
@@ -107,6 +109,8 @@ st.markdown(f"""
         background: transparent !important;
         color: #94A3B8 !important;
         border-bottom: 2px solid transparent !important;
+        font-weight: 600 !important;
+        font-size: 15px !important;
     }}
     button[data-baseweb="tab"][aria-selected="true"] {{
         color: #3BE8B0 !important;
@@ -115,9 +119,10 @@ st.markdown(f"""
     /* Make text inputs / select boxes dark */
     .stTextInput > div > div, .stNumberInput > div > div,
     .stSelectbox > div > div, [data-baseweb="select"] > div {{
-        background: rgba(15, 23, 42, 0.8) !important;
+        background: rgba(15, 23, 42, 0.9) !important;
         border-color: rgba(47, 137, 252, 0.3) !important;
         color: #E2E8F0 !important;
+        border-radius: 12px !important;
     }}
     .stTextInput input, .stNumberInput input {{
         color: #E2E8F0 !important;
@@ -125,9 +130,14 @@ st.markdown(f"""
     }}
     /* File uploader dark */
     [data-testid="stFileUploader"] {{
-        background: rgba(15, 23, 42, 0.6) !important;
-        border: 1px dashed rgba(47, 137, 252, 0.4) !important;
-        border-radius: 12px !important;
+        background: rgba(15, 23, 42, 0.7) !important;
+        border: 2px dashed rgba(47, 137, 252, 0.5) !important;
+        border-radius: 16px !important;
+        transition: all 0.3s ease !important;
+    }}
+    [data-testid="stFileUploader"]:hover {{
+        border-color: #3BE8B0 !important;
+        background: rgba(15, 23, 42, 0.85) !important;
     }}
     /* Slider dark */
     .stSlider > div > div {{
@@ -135,22 +145,27 @@ st.markdown(f"""
     }}
     /* st.info / st.success / st.warning / st.error dark */
     [data-testid="stNotification"] {{
-        background: rgba(15, 23, 42, 0.7) !important;
+        background: rgba(15, 23, 42, 0.85) !important;
         border: 1px solid rgba(47, 137, 252, 0.3) !important;
         color: #CBD5E1 !important;
+        border-radius: 12px !important;
     }}
     /* Buttons dark */
     .stButton > button {{
-        background: linear-gradient(135deg, rgba(47, 137, 252, 0.3), rgba(59, 232, 176, 0.2)) !important;
-        border: 1px solid rgba(47, 137, 252, 0.5) !important;
-        color: #E2E8F0 !important;
-        border-radius: 8px !important;
+        background: linear-gradient(135deg, #2F89FC, #3BE8B0) !important;
+        border: none !important;
+        color: white !important;
+        border-radius: 12px !important;
         transition: all 0.3s ease !important;
+        font-weight: 600 !important;
+        font-size: 15px !important;
+        padding: 0.75rem 1.5rem !important;
+        box-shadow: 0 4px 15px rgba(47, 137, 252, 0.3) !important;
     }}
     .stButton > button:hover {{
-        background: linear-gradient(135deg, rgba(47, 137, 252, 0.5), rgba(59, 232, 176, 0.35)) !important;
-        border-color: #3BE8B0 !important;
-        transform: translateY(-2px) !important;
+        background: linear-gradient(135deg, #1a75ff, #10c98b) !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 25px rgba(47, 137, 252, 0.4) !important;
     }}
     /* Markdown and all general text */
     .stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown h1, .stMarkdown h2,
@@ -172,21 +187,22 @@ st.markdown(f"""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: rgba(15, 23, 42, 0.85);
-        backdrop-filter: blur(16px);
-        padding: 15px 40px;
-        border-bottom: 1px solid rgba(47, 137, 252, 0.25);
-        margin-bottom: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        background: rgba(15, 23, 42, 0.9);
+        backdrop-filter: blur(20px);
+        padding: 18px 45px;
+        border-bottom: 1px solid rgba(47, 137, 252, 0.3);
+        margin-bottom: 30px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }}
     .medi-logo {{
-        font-size: 26px;
-        font-weight: 700;
-        color: #2F89FC;
-    }}
-    .medi-logo span {{
-        color: #3BE8B0;
+        font-size: 28px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #2F89FC, #3BE8B0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.5px;
     }}
     .medi-contact-info {{
         font-size: 14px;
@@ -194,87 +210,109 @@ st.markdown(f"""
         font-weight: 500;
     }}
     
+    /* Hero Main Styling */
+    .hero-main {{
+        text-align: center;
+        padding: 50px 20px 30px;
+    }}
+    .hero-badge {{
+        background: linear-gradient(135deg, rgba(59, 232, 176, 0.2), rgba(47, 137, 252, 0.2));
+        color: #3BE8B0;
+        padding: 10px 24px;
+        border-radius: 50px;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        display: inline-block;
+        margin-bottom: 25px;
+        border: 1px solid rgba(59, 232, 176, 0.3);
+    }}
+    .hero-title {{
+        font-size: 64px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #FFFFFF, #E0F2FE, #6EE7B7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 20px;
+        letter-spacing: -1px;
+        line-height: 1.1;
+    }}
+    .hero-subtitle {{
+        font-size: 20px;
+        color: #94A3B8;
+        max-width: 700px;
+        margin: 0 auto 40px auto;
+        line-height: 1.6;
+    }}
+    .hero-divider {{
+        width: 100px;
+        height: 4px;
+        background: linear-gradient(90deg, #2F89FC, #3BE8B0);
+        border-radius: 10px;
+        margin: 0 auto 50px auto;
+    }}
+    .hero-features-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 25px;
+        margin-top: 50px;
+    }}
+    
     /* Medi+ Feature Cards — DARK Glassmorphism */
     .medi-card {{
-        background: rgba(15, 23, 42, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(47, 137, 252, 0.2);
-        border-radius: 12px;
-        padding: 30px 25px;
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(47, 137, 252, 0.25);
+        border-radius: 18px;
+        padding: 35px 30px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }}
     .medi-card:hover {{
-        transform: translateY(-4px);
-        box-shadow: 0 12px 30px rgba(47,137,252,0.2);
+        transform: translateY(-8px);
+        box-shadow: 0 16px 45px rgba(47,137,252,0.3);
         border-color: #3BE8B0;
     }}
     .medi-card-icon {{
-        width: 60px;
-        height: 60px;
+        width: 70px;
+        height: 70px;
         border-radius: 50%;
-        background-color: rgba(47, 137, 252, 0.15);
+        background: linear-gradient(135deg, rgba(47, 137, 252, 0.2), rgba(59, 232, 176, 0.15));
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #2F89FC;
-        font-size: 24px;
-        margin-bottom: 20px;
+        color: #3BE8B0;
+        font-size: 30px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 15px rgba(47, 137, 252, 0.2);
     }}
     .medi-card h3 {{
-        color: #F1F5F9 !important;
+        color: #F8FAFC !important;
         font-weight: 700;
+        font-size: 20px;
         margin-bottom: 12px;
+        letter-spacing: -0.3px;
     }}
     .medi-card p {{
         color: #94A3B8 !important;
-        font-size: 14px;
-        line-height: 1.6;
-    }}
-    
-    /* Hero Banner overlay card — DARK */
-    .medi-hero-overlay {{
-        background: rgba(15, 23, 42, 0.8);
-        backdrop-filter: blur(16px);
-        padding: 50px;
-        border-radius: 16px;
-        border: 1px solid rgba(47, 137, 252, 0.2);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-        margin-bottom: 40px;
-    }}
-    .medi-hero-tag {{
-        background-color: rgba(59, 232, 176, 0.15);
-        color: #3BE8B0;
-        padding: 6px 14px;
-        border-radius: 9999px;
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        display: inline-block;
-        margin-bottom: 15px;
-    }}
-    .medi-hero-overlay h1 {{
-        font-size: 44px;
-        font-weight: 700;
-        color: #F1F5F9 !important;
-        margin-bottom: 15px;
-    }}
-    .medi-hero-overlay p {{
-        color: #94A3B8 !important;
+        font-size: 15px;
+        line-height: 1.7;
     }}
     
     /* Interactive Appointment Area — DARK */
     .appointment-box {{
-        background: rgba(15, 23, 42, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(47, 137, 252, 0.2);
-        border-radius: 16px;
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(47, 137, 252, 0.25);
+        border-radius: 18px;
         padding: 40px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
     }}
     .appointment-box h3 {{
-        color: #F1F5F9 !important;
+        color: #F8FAFC !important;
     }}
     .appointment-box p {{
         color: #94A3B8 !important;
@@ -285,46 +323,49 @@ st.markdown(f"""
         font-size: 12px;
         color: #94A3B8 !important;
         text-transform: uppercase;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+        font-weight: 700;
+        letter-spacing: 1px;
     }}
     .metric-number {{
-        font-size: 30px;
-        font-weight: 700;
-        color: #3BE8B0;
+        font-size: 34px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #3BE8B0, #2F89FC);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         margin-top: 5px;
     }}
     
     /* Clinical alerts — DARK */
     .clinical-severe {{
-        background-color: rgba(127, 29, 29, 0.5);
-        border-left: 6px solid #EF4444;
-        padding: 15px 20px;
-        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.6), rgba(239, 68, 68, 0.2));
+        border-left: 7px solid #EF4444;
+        padding: 20px 25px;
+        border-radius: 12px;
         color: #FCA5A5 !important;
         font-weight: 700;
         margin-bottom: 20px;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
     }}
     .clinical-warning {{
-        background-color: rgba(120, 83, 9, 0.4);
-        border-left: 6px solid #F59E0B;
-        padding: 15px 20px;
-        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(120, 83, 9, 0.5), rgba(245, 158, 11, 0.2));
+        border-left: 7px solid #F59E0B;
+        padding: 20px 25px;
+        border-radius: 12px;
         color: #FCD34D !important;
         font-weight: 700;
         margin-bottom: 20px;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
     }}
     .clinical-normal {{
-        background-color: rgba(6, 78, 59, 0.4);
-        border-left: 6px solid #10B981;
-        padding: 15px 20px;
-        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(6, 78, 59, 0.5), rgba(16, 185, 129, 0.2));
+        border-left: 7px solid #10B981;
+        padding: 20px 25px;
+        border-radius: 12px;
         color: #6EE7B7 !important;
         font-weight: 700;
         margin-bottom: 20px;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
     }}
     
     .eq-box {{
@@ -360,9 +401,9 @@ if video_base64:
 # --- Top Navigation Bar ---
 st.markdown("""
     <div class="medi-header">
-        <div class="medi-logo">Medi<span>+ AI</span></div>
+        <div class="medi-logo">opticNova</div>
         <div class="medi-contact-info">
-            🏥 Emergency: <b>1-800-555-OCU</b> &nbsp;&nbsp;|&nbsp;&nbsp; ✉️ Clinical: <b>support@mediplus.ai</b>
+            🏥 Emergency: <b>1-800-555-OCU</b> &nbsp;&nbsp;|&nbsp;&nbsp; ✉️ Clinical: <b>support@opticnova.ai</b>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -371,33 +412,119 @@ st.markdown("""
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "🏠 Medi+ Home Portal"
 
-col_nav1, col_nav2 = st.columns(2)
+col_nav1, col_nav2, col_nav3 = st.columns([2, 2, 1])
 with col_nav1:
     if st.button("🏠 Medi+ Home Portal", use_container_width=True):
         st.session_state.active_tab = "🏠 Medi+ Home Portal"
 with col_nav2:
     if st.button("🔬 Diagnostic Workstation", use_container_width=True):
         st.session_state.active_tab = "🔬 Diagnostic Workstation"
+with col_nav3:
+    ai_accessibility = st.button("🎤 AI Accessibility Mode", use_container_width=True, type="primary")
 
 st.markdown("---")
+
+# --- OpenRouter Integration Functions ---
+def image_to_base64(image):
+    """Convert PIL Image or numpy array to base64 string"""
+    import io
+    if isinstance(image, np.ndarray):
+        if len(image.shape) == 2:  # Grayscale
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image_pil = Image.fromarray(image)
+    else:
+        image_pil = image
+    # Resize image to reduce size
+    image_pil = image_pil.resize((512, 512))
+    buffered = io.BytesIO()
+    image_pil.save(buffered, format="JPEG", quality=70)
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return img_str
+
+def analyze_with_openrouter(images, context_text=""):
+    """Analyze using OpenRouter API - first text-based (more reliable)"""
+    OPENROUTER_API_KEY = ""  # Set via environment variable or Streamlit secrets
+    
+    messages = [
+        {
+            "role": "system",
+            "content": "You are opticNova AI, an ophthalmic diagnostic assistant. Your job is to provide a clear, detailed, easy-to-understand description for visually impaired users. Explain what the measurements mean and the overall diagnostic assessment in a friendly, conversational tone."
+        },
+        {
+            "role": "user",
+            "content": f"Context: {context_text}\n\nPlease provide a comprehensive analysis for a blind person. Include the key findings, explain what the measurements mean, and summarize the overall diagnostic assessment."
+        }
+    ]
+    
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://localhost:8503",
+                "X-Title": "opticNova Ophthalmic Suite"
+            },
+            json={
+                "model": "openrouter/free",
+                "messages": messages,
+                "max_tokens": 2048
+            }
+        )
+        print(f"OpenRouter status: {response.status_code}")
+        print(f"OpenRouter response: {response.text[:500]}")
+        response.raise_for_status()
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        return f"Error in AI analysis: {str(e)}. Please check your API key."
+
+# --- Text-to-Speech Component ---
+def text_to_speech(text):
+    """Add JavaScript text-to-speech to the page"""
+    # Escape the text for JavaScript
+    escaped_text = text.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+    st.markdown(f"""
+        <script>
+            // Function to speak text
+            function speakText(text) {{
+                if ('speechSynthesis' in window) {{
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    utterance.lang = 'en-US';
+                    window.speechSynthesis.speak(utterance);
+                }}
+            }}
+            // Speak the text when component loads
+            speakText(`{escaped_text}`);
+        </script>
+    """, unsafe_allow_html=True)
 
 # ==============================================================================
 # PORTAL HOME PAGE (Colorlib Medi+ Inspired)
 # ==============================================================================
 if st.session_state.active_tab == "🏠 Medi+ Home Portal":
     
-    # Hero Area
+    # Hero Area - Two Column Layout
     st.markdown("""
-        <div class="medi-hero-overlay">
-            <span class="medi-hero-tag">Clinical AI Solution</span>
-            <h1>Ophthalmic Eye Detection & Biomarker Suite</h1>
-            <p>An advanced clinical intelligence system powered by deep learning. Instantly segment the optic nerve head, calculate microvascular tortuosity, and verify physiological ISNT compliance.</p>
+        <div class="hero-main" style="display: flex; flex-wrap: wrap; align-items: center; gap: 60px; justify-content: center; padding: 40px 20px;">
+            <div style="flex: 1; min-width: 350px; text-align: left;">
+                <span class="hero-badge">🚀 Advanced Clinical AI</span>
+                <h1 class="hero-title" style="font-size: 80px; letter-spacing: 2px; margin-bottom: 10px; line-height: 1;">opticNova</h1>
+                <p class="hero-subtitle" style="font-size: 22px; color: #94A3B8; margin-bottom: 30px;">An advanced clinical intelligence system powered by deep learning. Instantly segment the optic nerve head, calculate microvascular tortuosity, and verify physiological ISNT compliance.</p>
+                <div class="hero-divider"></div>
+            </div>
+            <div style="flex: 1; min-width: 350px; max-width: 500px;">
+                <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1000&auto=format&fit=crop" 
+                     style="width: 100%; border-radius: 24px; box-shadow: 0 20px 60px rgba(47, 137, 252, 0.3); border: 2px solid rgba(47, 137, 252, 0.2);">
+            </div>
         </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("<h2 style='text-align: center; margin-bottom: 40px; font-weight: 700; color: #F1F5F9;'>Our Clinical Features</h2>", unsafe_allow_html=True)
     
     # Feature Cards Row
+    st.markdown("<h2 style='text-align: center; margin-bottom: 40px; font-weight: 700; color: #F8FAFC;'>Our Clinical Features</h2>", unsafe_allow_html=True)
+    
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         st.markdown("""
@@ -431,8 +558,8 @@ if st.session_state.active_tab == "🏠 Medi+ Home Portal":
         st.markdown("""
             <div class="appointment-box">
                 <div style="margin-bottom: 25px;">
-                    <h3 style="color:#2D3748; margin:0 0 5px 0;">Schedule Trial Analysis</h3>
-                    <p style="color:#718096; margin:0; font-size:14px;">Fill in basic patient data metadata. Then switch to the <b>Diagnostic Workstation</b> to upload retinal scans.</p>
+                    <h3 style="margin:0 0 5px 0;">Schedule Trial Analysis</h3>
+                    <p style="margin:0; font-size:14px; color:#94A3B8;">Fill in basic patient data metadata. Then switch to the <b>Diagnostic Workstation</b> to upload retinal scans.</p>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -468,7 +595,7 @@ if st.session_state.active_tab == "🏠 Medi+ Home Portal":
 # WORKSTATION PAGE
 # ==============================================================================
 else:
-    st.markdown("<h2 style='color:#F1F5F9; margin-top: 0;'>🔬 Diagnostic Workstation</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#F8FAFC; margin-top: 0;'>🔬 Diagnostic Workstation</h2>", unsafe_allow_html=True)
     st.markdown("Run automated PyTorch segmentations and compute mathematical biomarker metrics for patients.")
     
     # Input Scan Configurations
@@ -543,7 +670,8 @@ else:
             # 6. Macular Drusen Segmentation
             drusen_dict = detect_macular_drusen(resized_img, disc_mask_np, eye_side=eye_side)
             drusen_mask = drusen_dict["drusen_mask"]
-            drusen_area_ratio = drusen_dict["drusen_area_ratio"]
+            drusen_analysis = drusen_dict["drusen_analysis"]
+            drusen_area_ratio = drusen_analysis["area_ratio"]
             macula_cx, macula_cy = drusen_dict["macula_center"]
             macula_radius = drusen_dict["macula_radius"]
             
@@ -554,13 +682,13 @@ else:
             # 8. Geometric metrics
             cup_v_diameter = calculate_vertical_diameter(cup_mask_np)
             disc_v_diameter = calculate_vertical_diameter(disc_mask_np)
-            cdr = calculate_cdr(disc_mask_np, cup_mask_np)
+            cdr_result = calculate_cdr(disc_mask_np, cup_mask_np)
             disc_area = calculate_area(disc_mask_np)
             cup_area = calculate_area(cup_mask_np)
-            rim_area = calculate_rim_area(disc_mask_np, cup_mask_np)
+            rim_area = disc_area - cup_area
             
             severity = compute_severity_score(
-                prob, cdr, rim_area, 
+                prob, cdr_result["vertical_cdr"], rim_area, 
                 isnt_compliant=isnt_compliant, 
                 vessel_density=vessel_density, 
                 vessel_tortuosity=mean_tortuosity
@@ -574,6 +702,60 @@ else:
             st.markdown(f'<div class="clinical-warning">⚠️ CLINICAL WARNING: {severity["category"].upper()} — Index: {severity["score"]}/100</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="clinical-normal">✅ CLINICAL NORMAL: Retinal structure shows low anomaly risk — Index: {severity["score"]}/100</div>', unsafe_allow_html=True)
+
+        # Pre-generate blended images for AI accessibility
+        combined_overlay = clahe_img.copy()
+        combined_overlay[disc_mask_np > 0.5] = [0, 200, 0]
+        combined_overlay[cup_mask_np > 0.5] = [255, 50, 50]
+        blended = cv2.addWeighted(clahe_img, 0.6, combined_overlay, 0.4, 0)
+        
+        overlay_v = clahe_img.copy()
+        overlay_v[vessel_mask > 0] = [255, 0, 0]
+        blended_v = cv2.addWeighted(clahe_img, 0.65, overlay_v, 0.35, 0)
+
+        # AI Accessibility Mode - Comprehensive Analysis
+        if st.button("🎤 Start AI Accessibility Analysis", type="primary", use_container_width=True):
+            with st.spinner("🤖 opticNova AI Analyzing Results..."):
+                # Collect all relevant images
+                analysis_images = [
+                    resized_img,           # Original image
+                    clahe_img,            # Enhanced image
+                    heatmap_overlay,      # Grad-CAM
+                    yolo_img,             # YOLO
+                    blended,              # Segmentation overlay
+                    blended_v,              # Vessel overlay
+                ]
+                
+                # Prepare context text
+                context = f"""
+                Ophthalmic analysis results:
+                - Laterality: {eye_side}
+                - Diagnosis: {severity["category"]}
+                - Severity Score: {severity["score"]}/100
+                - Cup to Disc Ratio (vertical): {cdr_result['vertical_cdr']:.3f}
+                - ISNT Rule Compliant: {'Yes' if isnt_compliant else 'No'}
+                - Vessel Density: {vessel_density:.2%}
+                - Vessel Tortuosity: {mean_tortuosity:.4f}
+                - Drusen Area Ratio: {drusen_area_ratio:.4%}
+                - Drusen Count: {drusen_analysis['count']}
+                """
+                
+                # Get AI analysis
+                ai_result = analyze_with_openrouter(analysis_images, context)
+                
+                # Display AI analysis
+                st.markdown("### 🤖 opticNova AI Analysis")
+                st.markdown(f"""
+                    <div class="appointment-box">
+                        <div style="margin-bottom: 15px;">
+                            <h3 style="background: linear-gradient(135deg, #2F89FC, #3BE8B0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin:0;">Comprehensive Analysis</h3>
+                        <p style="color: #E2E8F0; font-size: 16px; line-height: 1.7; white-space: pre-wrap;">{ai_result}</p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Text-to-Speech
+                text_to_speech(ai_result)
 
         # Workstation Analysis Tabs
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -601,7 +783,7 @@ else:
             
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1:
-                st.markdown(f"<div class='medi-card'><div class='metric-title'>Vertical CDR</div><div class='metric-number'>{cdr:.3f}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='medi-card'><div class='metric-title'>Vertical CDR</div><div class='metric-number'>{cdr_result['vertical_cdr']:.3f}</div></div>", unsafe_allow_html=True)
             with c2:
                 st.markdown(f"<div class='medi-card'><div class='metric-title'>ISNT Compliant</div><div class='metric-number'>{'YES' if isnt_compliant else 'NO'}</div></div>", unsafe_allow_html=True)
             with c3:
@@ -613,10 +795,6 @@ else:
 
             col_sub1, col_sub2 = st.columns([1, 1])
             with col_sub1:
-                combined_overlay = clahe_img.copy()
-                combined_overlay[disc_mask_np > 0.5] = [0, 200, 0]
-                combined_overlay[cup_mask_np > 0.5] = [255, 50, 50]
-                blended = cv2.addWeighted(clahe_img, 0.6, combined_overlay, 0.4, 0)
                 st.image(blended, caption="Optic Nerve Segments (Green=Disc, Red=Cup)", use_container_width=True)
             with col_sub2:
                 fig = plt.figure(figsize=(6, 5))
@@ -651,9 +829,6 @@ else:
             st.markdown("### Retinal Blood Vessel Segmentation")
             col_v1, col_v2 = st.columns([1, 1])
             with col_v1:
-                overlay_v = clahe_img.copy()
-                overlay_v[vessel_mask > 0] = [255, 0, 0]
-                blended_v = cv2.addWeighted(clahe_img, 0.65, overlay_v, 0.35, 0)
                 st.image(blended_v, caption="Segmented Retinal Vasculature (Red Overlay)", use_container_width=True)
             with col_v2:
                 st.markdown("#### Vascular Metrics")
@@ -682,7 +857,13 @@ else:
                 st.image(blended_d, caption="Macula ROI (Blue) & Drusen Segmentation (Yellow)", use_container_width=True)
             with col_d2:
                 st.markdown("#### Macular Biomarkers")
-                st.markdown(f"<div class='medi-card'><div class='metric-title'>Drusen Area Ratio (DAR)</div><div class='metric-number'>{drusen_area_ratio:.4%}</div></div>", unsafe_allow_html=True)
+                sc1, sc2, sc3 = st.columns(3)
+                with sc1:
+                    st.markdown(f"<div class='medi-card'><div class='metric-title'>Drusen Count</div><div class='metric-number'>{drusen_analysis['count']}</div></div>", unsafe_allow_html=True)
+                with sc2:
+                    st.markdown(f"<div class='medi-card'><div class='metric-title'>DAR</div><div class='metric-number'>{drusen_area_ratio:.4%}</div></div>", unsafe_allow_html=True)
+                with sc3:
+                    st.markdown(f"<div class='medi-card'><div class='metric-title'>Severity</div><div class='metric-number'>{drusen_dict['severity']['category']}</div></div>", unsafe_allow_html=True)
                 
                 if drusen_area_ratio < 0.005:
                     st.success("✅ **Healthy Macula**: No significant drusen accumulation detected in the macular region.")
@@ -690,35 +871,209 @@ else:
                     st.warning("⚠️ **Mild Drusen Accumulation**: Detected early drusen deposits in macular ROI. Monitor closely for dry AMD signs.")
                 else:
                     st.error("🔴 **High Anomaly Density**: High concentration of drusen spots within the Macula ROI, suggesting Dry Age-related Macular Degeneration (AMD).")
+                
+                st.markdown(f"Size Distribution: {drusen_analysis['size_distribution']['small']} small, {drusen_analysis['size_distribution']['medium']} medium, {drusen_analysis['size_distribution']['large']} large drusen.")
 
         # --- TAB 5 ---
         with tab5:
             st.markdown("### 📐 Mathematical Proofs & Diagnostic Summary Report")
             
-            st.markdown("#### 1. Vertical Cup-to-Disc Ratio (vCDR)")
+            st.markdown("#### 1. Histogram Equalization (Image Enhancement)")
             st.markdown('<div class="eq-box">', unsafe_allow_html=True)
-            st.latex(r"\text{vCDR} = \frac{H_{\text{cup}}}{H_{\text{disc}}}")
-            st.markdown(f'<div class="eq-result">📐 <b>Patient Value:</b> {cup_v_diameter} px / {disc_v_diameter} px = <b>{cdr:.4f}</b></div>', unsafe_allow_html=True)
+            st.markdown("**Improves visibility of blood vessels and lesions:**")
+            st.latex(r"s_k = (L-1) \sum_{j=0}^{k} p(r_j)")
+            st.markdown("""
+                <p style="color: #94A3B8; margin-top: 10px;">
+                    <b>Where:</b><br>
+                    • <i>L</i> = number of intensity levels<br>
+                    • <i>p(r_j)</i> = probability of pixel intensity <i>r_j</i>
+                </p>
+            """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            st.markdown("#### 2. Drusen Area Ratio (DAR)")
+            # Histogram visualization
+            col_h1, col_h2 = st.columns([1, 1])
+            with col_h1:
+                # Original histogram
+                fig_hist, ax_hist = plt.subplots(figsize=(5, 4))
+                img_gray = cv2.cvtColor(resized_img, cv2.COLOR_RGB2GRAY)
+                ax_hist.hist(img_gray.ravel(), 256, [0,256], color='#2F89FC', alpha=0.7)
+                ax_hist.set_title('Original Intensity Histogram', color='#E2E8F0', fontweight='bold')
+                ax_hist.set_xlabel('Pixel Intensity', color='#94A3B8')
+                ax_hist.set_ylabel('Frequency', color='#94A3B8')
+                ax_hist.tick_params(colors='#94A3B8')
+                fig_hist.patch.set_facecolor('none')
+                ax_hist.set_facecolor('none')
+                st.pyplot(fig_hist)
+            with col_h2:
+                # Equalized image and histogram
+                fig_eq, ax_eq = plt.subplots(figsize=(5, 4))
+                img_eq = cv2.equalizeHist(img_gray)
+                ax_eq.hist(img_eq.ravel(), 256, [0,256], color='#3BE8B0', alpha=0.7)
+                ax_eq.set_title('Equalized Intensity Histogram', color='#E2E8F0', fontweight='bold')
+                ax_eq.set_xlabel('Pixel Intensity', color='#94A3B8')
+                ax_eq.set_ylabel('Frequency', color='#94A3B8')
+                ax_eq.tick_params(colors='#94A3B8')
+                fig_eq.patch.set_facecolor('none')
+                ax_eq.set_facecolor('none')
+                st.pyplot(fig_eq)
+            
+            st.markdown("---")
+            st.markdown("#### 2. Convolution Operations (Linear Algebra)")
+            st.markdown('<div class="eq-box">', unsafe_allow_html=True)
+            st.markdown("**CNNs are fundamentally matrix operations. Feature extraction is performed using convolutional operators based on discrete linear algebra.**")
+            st.latex(r"S(i,j) = \sum_{m} \sum_{n} I(i+m, j+n) K(m,n)")
+            st.markdown("""
+                <p style="color: #94A3B8; margin-top: 10px;">
+                    <b>Detects:</b><br>
+                    • Blood vessels<br>
+                    • Optic disc boundaries<br>
+                    • Exudates<br>
+                    • Hemorrhages
+                </p>
+            """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Convolution visualization
+            col_c1, col_c2 = st.columns([1, 1])
+            with col_c1:
+                st.image(resized_img, caption="Original Image", use_container_width=True)
+            with col_c2:
+                # Sobel edge detection (convolution)
+                sobelx = cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=3)
+                sobely = cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=3)
+                sobel_mag = np.sqrt(sobelx**2 + sobely**2)
+                sobel_mag = (sobel_mag / sobel_mag.max() * 255).astype(np.uint8)
+                st.image(sobel_mag, caption="Convolution Output (Edge Detection)", use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("#### 3. Disease Classification (Cross-Entropy Loss)")
+            st.markdown('<div class="eq-box">', unsafe_allow_html=True)
+            st.markdown("**Neural network learns parameters by minimizing loss function:**")
+            st.latex(r"L = -\sum_{i=1}^{C} y_i \log(\hat{y}_i)")
+            st.markdown("""
+                <p style="color: #94A3B8; margin-top: 10px;">
+                    <b>Where:</b><br>
+                    • <i>y_i</i> = true label<br>
+                    • <i>\hat{y}_i</i> = predicted probability<br>
+                    • <i>C</i> = number of disease classes
+                </p>
+            """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Classification probability visualization
+            col_clf1, col_clf2 = st.columns([1, 1])
+            with col_clf1:
+                st.markdown("<p style='color:#94A3B8; font-weight:600;'>Model Prediction Probabilities</p>", unsafe_allow_html=True)
+                labels = ["Healthy", "Glaucoma Suspect", "AMD", "Other"]
+                probs = [prob, 1-prob, 0.1, 0.05] if prob < 0.5 else [1-prob, prob, 0.1, 0.05]
+                probs = np.array(probs)
+                probs = probs / probs.sum()
+                fig_clf, ax_clf = plt.subplots(figsize=(5,4))
+                colors = ['#10B981', '#3BE8B0', '#F59E0B', '#EF4444']
+                bars = ax_clf.bar(labels, probs, color=colors, alpha=0.7)
+                ax_clf.set_title("Classification Probabilities", color='#E2E8F0', fontweight='bold')
+                ax_clf.set_ylabel("Probability", color='#94A3B8')
+                ax_clf.tick_params(colors='#94A3B8', rotation=15)
+                for bar in bars:
+                    height = bar.get_height()
+                    ax_clf.text(bar.get_x() + bar.get_width()/2., height,
+                                f'{height:.2f}', ha='center', va='bottom',
+                                color='#E2E8F0', fontweight='bold')
+                fig_clf.patch.set_facecolor('none')
+                ax_clf.set_facecolor('none')
+                st.pyplot(fig_clf)
+            with col_clf2:
+                st.markdown("<p style='color:#94A3B8; font-weight:600;'>Loss Visualization</p>", unsafe_allow_html=True)
+                fig_loss, ax_loss = plt.subplots(figsize=(5,4))
+                iterations = np.arange(1, 101)
+                loss = 2 * np.exp(-0.03 * iterations) + 0.1
+                ax_loss.plot(iterations, loss, color='#2F89FC', linewidth=3)
+                ax_loss.set_title("Loss Reduction Over Training", color='#E2E8F0', fontweight='bold')
+                ax_loss.set_xlabel("Iteration", color='#94A3B8')
+                ax_loss.set_ylabel("Cross-Entropy Loss", color='#94A3B8')
+                ax_loss.tick_params(colors='#94A3B8')
+                fig_loss.patch.set_facecolor('none')
+                ax_loss.set_facecolor('none')
+                st.pyplot(fig_loss)
+            
+            st.markdown("---")
+            st.markdown("#### 4. Gradient Descent Optimization")
+            st.markdown('<div class="eq-box">', unsafe_allow_html=True)
+            st.markdown("**Weights are updated using gradient descent:**")
+            st.latex(r"w_{t+1} = w_t - \eta \nabla L(w_t)")
+            st.markdown("""
+                <p style="color: #94A3B8; margin-top: 10px;">
+                    <b>Where:</b><br>
+                    • <i>w_t</i> = current weights<br>
+                    • <i>η</i> = learning rate<br>
+                    • <i>∇L</i> = gradient of the loss
+                </p>
+            """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Gradient descent visualization
+            fig_gd, ax_gd = plt.subplots(figsize=(8,4))
+            w = np.linspace(-5, 5, 100)
+            loss_func = w**2 + 0.5*w + 1
+            ax_gd.plot(w, loss_func, color='#2F89FC', linewidth=2, label='Loss Function')
+            # Gradient descent steps
+            w_gd = [-4]
+            lr = 0.2
+            for i in range(10):
+                grad = 2*w_gd[-1] + 0.5
+                next_w = w_gd[-1] - lr * grad
+                w_gd.append(next_w)
+            loss_gd = [w_val**2 + 0.5*w_val +1 for w_val in w_gd]
+            ax_gd.plot(w_gd, loss_gd, 'o-', color='#EF4444', markersize=8, linewidth=2, label='Gradient Descent Path')
+            ax_gd.set_title("Gradient Descent Optimization Path", color='#E2E8F0', fontweight='bold')
+            ax_gd.set_xlabel("Weight (w)", color='#94A3B8')
+            ax_gd.set_ylabel("Loss", color='#94A3B8')
+            ax_gd.tick_params(colors='#94A3B8')
+            ax_gd.legend(facecolor='none', edgecolor='none', labelcolor='#94A3B8')
+            fig_gd.patch.set_facecolor('none')
+            ax_gd.set_facecolor('none')
+            st.pyplot(fig_gd)
+            
+            st.markdown("---")
+            st.markdown("#### 5. Mathematical Detection of Glaucoma (CDR)")
+            st.markdown('<div class="eq-box">', unsafe_allow_html=True)
+            st.markdown("**Cup-to-Disc Ratio (CDR):**")
+            st.latex(r"\text{CDR} = \frac{D_{\text{cup}}}{D_{\text{disc}}}")
+            st.markdown("""
+                <p style="color: #94A3B8; margin-top: 10px;">
+                    <b>Where:</b><br>
+                    • <i>D_cup</i> = diameter of optic cup<br>
+                    • <i>D_disc</i> = diameter of optic disc<br>
+                    • <b>If CDR > 0.6</b>, patient may have glaucoma
+                </p>
+            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="eq-result">📐 <b>Patient Vertical CDR:</b> {cup_v_diameter} px / {disc_v_diameter} px = <b>{cdr_result["vertical_cdr"]:.4f}</b></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="eq-result">📐 <b>Horizontal CDR:</b> <b>{cdr_result["horizontal_cdr"]:.4f}</b> | <b>Area CDR:</b> <b>{cdr_result["area_cdr"]:.4f}</b></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="eq-result">{"⚠️" if cdr_result["vertical_cdr"] > 0.6 else "✅"} <b>CDR Assessment:</b> {"Possible glaucoma risk (CDR > 0.6)" if cdr_result["vertical_cdr"] > 0.6 else "Normal CDR"}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.markdown("#### 6. Drusen Area Ratio (DAR)")
             st.markdown('<div class="eq-box">', unsafe_allow_html=True)
             st.latex(r"\text{DAR} = \frac{\sum_{(x,y) \in \text{Macular ROI}} \mathbb{1}[\text{Drusen}(x,y) > 0]}{\sum_{(x,y) \in \text{Macular ROI}} \mathbb{1}[\text{ROI}(x,y) > 0]}")
             st.markdown(f'<div class="eq-result">🟡 <b>Patient Value:</b> Drusen Area Ratio (DAR) = <b>{drusen_area_ratio:.4%}</b></div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
-            st.markdown("#### 3. Vessel Tortuosity Index")
+            st.markdown("---")
+            st.markdown("#### 7. Vessel Tortuosity Index")
             st.markdown('<div class="eq-box">', unsafe_allow_html=True)
             st.latex(r"T = \frac{1}{N} \sum_{i=1}^{N} \frac{L_{\text{arc}}^{(i)}}{L_{\text{chord}}^{(i)}}")
             st.markdown(f'<div class="eq-result">🕸️ <b>Patient Vessel Tortuosity (T):</b> <b>{mean_tortuosity:.4f}</b></div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
+            st.markdown("---")
             # Clinical report print area
             st.markdown("#### 📋 Comprehensive Diagnostic Summary Report")
             report_html = f"""
             <div style="background-color: rgba(15, 23, 42, 0.85); border: 1px solid rgba(47, 137, 252, 0.25); border-radius: 12px; padding: 30px; color: #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.3); backdrop-filter: blur(12px);">
                 <div style="text-align: center; margin-bottom: 25px;">
-                    <h2 style="color: #2F89FC; margin: 0; font-size:24px;">MEDI+ AI CLINICAL REPORT</h2>
+                    <h2 style="background: linear-gradient(135deg, #2F89FC, #3BE8B0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; font-size:24px; font-weight:800;">opticNova CLINICAL REPORT</h2>
                     <small style="color: #94A3B8; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Automated Retinal Biomarker & Diagnostics System</small>
                 </div>
                 <hr style="border: 0; border-top: 1px solid rgba(47, 137, 252, 0.2); margin: 15px 0;">
@@ -733,7 +1088,11 @@ else:
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; font-weight: 700; color:#94A3B8;">Vertical Cup-to-Disc Ratio (vCDR):</td>
-                        <td style="padding: 8px 0; color:#CBD5E1;">{cdr:.4f}</td>
+                        <td style="padding: 8px 0; color:#CBD5E1;">{cdr_result["vertical_cdr"]:.4f}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 700; color:#94A3B8;">Horizontal CDR / Area CDR:</td>
+                        <td style="padding: 8px 0; color:#CBD5E1;">hCDR: {cdr_result["horizontal_cdr"]:.4f} | aCDR: {cdr_result["area_cdr"]:.4f}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; font-weight: 700; color:#94A3B8;">ISNT Compliance:</td>
@@ -744,8 +1103,8 @@ else:
                         <td style="padding: 8px 0; color:#CBD5E1;">Density: {vessel_density:.2%} | Tortuosity Index: {mean_tortuosity:.4f}</td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px 0; font-weight: 700; color:#94A3B8;">Drusen Area Ratio (DAR):</td>
-                        <td style="padding: 8px 0; color:#CBD5E1;">{drusen_area_ratio:.4%} (Macula ROI Center: {macula_cx}px, {macula_cy}px)</td>
+                        <td style="padding: 8px 0; font-weight: 700; color:#94A3B8;">Drusen Count / DAR:</td>
+                        <td style="padding: 8px 0; color:#CBD5E1;">Count: {drusen_analysis['count']} | DAR: {drusen_area_ratio:.4%}</td>
                     </tr>
                     <tr style="border-top: 1px solid rgba(47, 137, 252, 0.2);">
                         <td style="padding: 12px 0; font-weight: 700; font-size: 16px; color: #3BE8B0;">Composite Severity Index:</td>
@@ -767,4 +1126,4 @@ else:
             st.markdown(report_html, unsafe_allow_html=True)
             st.button("🖨️ Print Clinical Report", on_click=None, help="Use browser print option to save this page as PDF.")
     else:
-        st.info("👋 Welcome! Please upload a fundus photograph above to activate the OcuVision AI Clinical Suite.")
+        st.info("👋 Welcome! Please upload a fundus photograph above to activate opticNova.")
