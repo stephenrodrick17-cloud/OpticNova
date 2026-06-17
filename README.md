@@ -90,7 +90,48 @@ Every metric comes with:
 
 ---
 
-## 🛠️ Tech Stack
+## � Screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <h4 align="center">Home Page</h4>
+      <div align="center">
+        <img src="assets/homepage.png" alt="Home Page" width="100%" style="border-radius: 12px; margin-bottom: 8px;">
+      </div>
+    </td>
+    <td width="50%">
+      <h4 align="center">Diagnostic Workstation</h4>
+      <div align="center">
+        <img src="assets/diagnostic-workstation.png" alt="Diagnostic Workstation" width="100%" style="border-radius: 12px; margin-bottom: 8px;">
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h4 align="center">Segmentation Tab</h4>
+      <div align="center">
+        <img src="assets/segmentation-tab.png" alt="Segmentation Tab" width="100%" style="border-radius: 12px; margin-bottom: 8px;">
+      </div>
+    </td>
+    <td width="50%">
+      <h4 align="center">Vessels Tab</h4>
+      <div align="center">
+        <img src="assets/vessels-tab.png" alt="Vessels Tab" width="100%" style="border-radius: 12px; margin-bottom: 8px;">
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <h4>Mathematical Proofs & Reports Tab</h4>
+      <img src="assets/mathematical-proofs-tab.png" alt="Mathematical Proofs Tab" width="80%" style="border-radius: 12px;">
+    </td>
+  </tr>
+</table>
+
+---
+
+## �🛠️ Tech Stack
 
 | Category | Technologies |
 |----------|--------------|
