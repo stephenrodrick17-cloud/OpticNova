@@ -3,7 +3,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/stephenrodrick17-cloud/OpticNova">
-    <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=128" alt="Logo" width="120" height="120" style="border-radius: 16px;">
+    <img src="assets/opticnova-logo.png" alt="opticNova Logo" width="140" height="140" style="border-radius: 20px; box-shadow: 0 8px 30px rgba(47, 137, 252, 0.35);">
   </a>
 
   <h1 align="center">opticNova</h1>
