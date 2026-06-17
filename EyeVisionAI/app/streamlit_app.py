@@ -443,7 +443,8 @@ def image_to_base64(image):
 
 def analyze_with_openrouter(images, context_text=""):
     """Analyze using OpenRouter API - first text-based (more reliable)"""
-    OPENROUTER_API_KEY = ""  # Set via environment variable or Streamlit secrets
+    import os
+    OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
     
     messages = [
         {
